@@ -1,25 +1,41 @@
-/*
- * Copy me if you can.
- * by 20h
- */
-
 #define _BSD_SOURCE
 #include <unistd.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdarg.h>
 #include <string.h>
+#include <ctype.h>
 #include <strings.h>
 #include <sys/time.h>
 #include <time.h>
 #include <sys/types.h>
 #include <sys/wait.h>
-
 #include <X11/Xlib.h>
+#include <sys/statvfs.h>
+#include <mpd/client.h>
+#include <sys/sysinfo.h>
 
-char *tzargentina = "America/Buenos_Aires";
+//0 desktop , 1 notebook
+#define NOTEBOOK 1
+
+//options
+#define BAT_DEVICE "BAT1"
+#define BAT_FULL_SYMBOL '='
+#define BAT_CHARGING_SYMBOL '+'
+#define BAT_DISCHARGING_SYMBOL '-'
+#define TEMP_SENSOR_DIR "/sys/devices/virtual/thermal/thermal_zone0/"
+#define TEMP_SENSOR0 "hwmon0"
+#define MPD_PORT 60960
+#define MPD_HOST "localhost"
+#define MPD_MAX_SONG_LEN 25
+#define ROOTFS "/"
+#define DATAFS "/mnt/PABLO"
+#define WIRELESS_IFACE "wlp3s0"
+#define WIRED_IFACE "enp0s31f6"
+
+//timezones
 char *tzutc = "UTC";
-char *tzberlin = "Europe/Berlin";
+char *tzsp = "America/Sao_Paulo";
 
 static Display *dpy;
 
@@ -89,7 +105,8 @@ loadavg(void)
 	if (getloadavg(avgs, 3) < 0)
 		return smprintf("");
 
-	return smprintf("%.2f %.2f %.2f", avgs[0], avgs[1], avgs[2]);
+	//return smprintf("%.2f %.2f %.2f", avgs[0], avgs[1], avgs[2]);
+	return smprintf("%.2f", avgs[0]);
 }
 
 char *
@@ -113,10 +130,13 @@ readfile(char *base, char *file)
 	return smprintf("%s", line);
 }
 
+#if NOTEBOOK
 char *
 getbattery(char *base)
 {
 	char *co, status;
+	int capacity;
+	/*
 	int descap, remcap;
 
 	descap = -1;
@@ -148,21 +168,27 @@ getbattery(char *base)
 	}
 	sscanf(co, "%d", &remcap);
 	free(co);
+	*/
+	co = readfile(base, "capacity");
+	sscanf(co, "%d",&capacity);
 
 	co = readfile(base, "status");
 	if (!strncmp(co, "Discharging", 11)) {
-		status = '-';
+		status = BAT_DISCHARGING_SYMBOL;
 	} else if(!strncmp(co, "Charging", 8)) {
-		status = '+';
+		status = BAT_CHARGING_SYMBOL;
 	} else {
-		status = '?';
+		status = BAT_FULL_SYMBOL;
 	}
-
+	
+	/*
 	if (remcap < 0 || descap < 0)
 		return smprintf("invalid");
+	*/
 
-	return smprintf("%.0f%%%c", ((float)remcap / (float)descap) * 100, status);
+	return smprintf("%d%%%c", capacity, status);
 }
+#endif
 
 char *
 gettemperature(char *base, char *sensor)
@@ -175,49 +201,365 @@ gettemperature(char *base, char *sensor)
 	return smprintf("%02.0f°C", atof(co) / 1000);
 }
 
+//ugly hack, don't stare at him
+char *
+cut_song_name(char *name)
+{
+	/* the mpd_song_get_uri function from mpdlib returns a complete 
+	 * path of the song(relative to the mpd song dir).
+	 * Therefore, this function processes the mpd_song_get_uri return 
+	 * string and removes the adjacent dir paths,also caps the strlen to 
+	 * MPD_MAX_SONG_LEN */
+
+	if(!strcmp(name, "")) return name;
+	
+	char *strRet;
+	char *p;
+	int lenp;
+
+	p =strstr(name, "/") + 1;
+	while(strstr(p, "/") != NULL)
+		p = strstr(p, "/") + 1;
+	
+	lenp = strlen(p);
+
+	if(lenp > MPD_MAX_SONG_LEN) {
+		strRet = (char *)calloc(MPD_MAX_SONG_LEN+6,sizeof(char));
+		strncpy(strRet, p,MPD_MAX_SONG_LEN);
+		strcat(strRet,"...");
+	}
+	else {
+		strRet = (char *)calloc(lenp + 2, sizeof(char));
+		strcpy(strRet,p);
+	}
+
+	free(name);
+	return(strRet);	
+}
+
+char *
+getmpdstat() {
+    struct mpd_song * song = NULL;
+	//const char * title = NULL;
+	//const char * artist = NULL;
+	const char * file_name = NULL;
+	char * retstr = NULL;
+	//int elapsed = 0, total = 0;
+    struct mpd_connection * conn ;
+    if (!(conn = mpd_connection_new(MPD_HOST, 0, MPD_PORT)) ||
+        mpd_connection_get_error(conn)){
+            return smprintf("");
+    }
+
+    mpd_command_list_begin(conn, true);
+    mpd_send_status(conn);
+    mpd_send_current_song(conn);
+    mpd_command_list_end(conn);
+
+    struct mpd_status* theStatus = mpd_recv_status(conn);
+    	/* MPD_STATE_PLAY, MPD_STATE_PAUSE , MPD_STATE_STOP */
+	if ((theStatus) && (mpd_status_get_state(theStatus) !=  MPD_STATE_STOP)){ 
+                mpd_response_next(conn);
+                song = mpd_recv_song(conn);
+                //title = smprintf("%s",mpd_song_get_tag(song, MPD_TAG_TITLE, 0));
+                //artist = smprintf("%s",mpd_song_get_tag(song, MPD_TAG_ARTIST, 0));
+                file_name = smprintf("%s",mpd_song_get_uri(song));
+
+                //elapsed = mpd_status_get_elapsed_time(theStatus);
+                //total = mpd_status_get_total_time(theStatus);
+                mpd_song_free(song);
+                /*
+		retstr = smprintf("%.2d:%.2d/%.2d:%.2d %s - %s",
+                                elapsed/60, elapsed%60,
+                                total/60, total%60,
+                                artist, title);
+		*/
+		/*
+		retstr = smprintf("(%.2d:%.2d/%.2d:%.2d) %s",
+				elapsed/60,
+				elapsed%60,
+                                total/60,
+				total%60,
+                                file_name);
+                */
+		
+		retstr = smprintf("%s",file_name);
+		//free((char*)title);
+                //free((char*)artist);
+                free((char*)file_name);
+        }
+        else retstr = smprintf("");
+		mpd_response_finish(conn);
+		mpd_connection_free(conn);
+		return retstr;
+}
+
+char *get_freespace(char *mntpt){
+    struct statvfs data;
+    double total, used = 0;
+
+    if ( (statvfs(mntpt, &data)) < 0){
+		fprintf(stderr, "can't get info on disk.\n");
+		return("?");
+    }
+    total = (data.f_blocks * data.f_frsize);
+    used = (data.f_blocks - data.f_bfree) * data.f_frsize ;
+    return(smprintf("%.0f", (used/total*100)));
+}
+
+char*
+runcmd(char* cmd) {
+	FILE* fp = popen(cmd, "r");
+	if (fp == NULL) return NULL;
+	char ln[50];
+	fgets(ln, sizeof(ln)-1, fp);
+	pclose(fp);
+	ln[strlen(ln)-1]='\0';
+	return smprintf("%s", ln);
+}
+
+int 
+runevery(time_t *ltime, int sec){
+    /* return 1 if sec elapsed since last run
+     * else return 0 
+    */
+    time_t now = time(NULL);
+    
+    if ( difftime(now, *ltime ) >= sec)
+    {
+        *ltime = now;
+        return(1);
+    }
+    else 
+        return(0);
+}
+
+char *
+get_vol() {
+	//int right=0;
+	int left=0;
+        
+	//sscanf(runcmd("amixer sget Master | grep 'Right:' | awk -F'[][]' '{ print $2 }'"), "%d%%", &right);
+        sscanf(runcmd("amixer sget Master | grep 'Left:' | awk -F'[][]' '{ print $2 }'"), "%d%%", &left);
+	
+	//return smprintf("%d%%|%d%%",left, right);
+	return smprintf("%d%%",left);
+}
+
+// 1 retorna a memória utilizada e 0 a memória livre
+char 
+*get_mem(int tipo) {
+	const double megabytes = 1024 * 1024;
+	unsigned long freemem,totalmem,ram;
+	struct sysinfo si;
+	
+	sysinfo(&si);
+	
+	freemem = si.freeram;
+	totalmem = si.totalram;
+	ram = tipo ? (totalmem - freemem)/megabytes : freemem/megabytes;
+		
+	return smprintf("%luM",ram);
+}
+
+char 
+*get_ip(const char *iface) {
+
+	char *ip = calloc(15,sizeof(char));
+	strcpy(ip, runcmd(smprintf("ip -4 -o addr show dev %s | awk '{split($4,a,\"/\");print a[1]}'",iface)));
+
+	
+	//sp
+	//char cmd0[] = "ip -4 -o addr show dev " , cmd1[] = " | awk '{split($4,a,\"/\");print a[1]}'";
+	//strcat(cmd0,iface);
+	//strcat(cmd0,cmd1);
+
+	//printf("%s",cmd0);
+	
+	//sscanf(runcmd(cmd0), "%s", &ip);
+	
+	//return runcmd(smprintf("ip -4 -o addr show dev %s | awk '{split($4,a,\"/\");print a[1]}'",iface));
+	
+	//toda string contendo um endereço ip terá o primeiro caractere alfanumerico,assim , uma saída inválida será filtrada nessa exceção
+	if(!isalnum(ip[0]))
+		strcpy(ip,"");
+	return ip;
+}
+
+//int sysinfo(struct sysinfo *info);
+//struct sysinfo {
+//	long uptime;             /* Seconds since boot */
+//       	unsigned long loads[3];  /* 1, 5, and 15 minute load averages */
+//       	unsigned long totalram;  /* Total usable main memory size */
+//       	unsigned long freeram;   /* Available memory size */
+//       	unsigned long sharedram; /* Amount of shared memory */
+//       	unsigned long bufferram; /* Memory used by buffers */
+//       	unsigned long totalswap; /* Total swap space size */
+//       	unsigned long freeswap;  /* swap space still available */
+//       	unsigned short procs;    /* Number of current processes */
+//      	unsigned long totalhigh; /* Total high memory size */
+//       	unsigned long freehigh;  /* Available high memory size */
+//       	unsigned int mem_unit;   /* Memory unit size in bytes */
+//   };	
+
+char *
+tmpinfo()
+{
+    	/* usr path as a buffer for any text */
+    	char *path = "/tmp/dwmbuf";
+    	char line[255];
+    	char *toprint = NULL;
+	FILE *fin;
+	//FILE *fout;
+	int c = 0;
+
+	fin = fopen(path, "r");
+	if (fin == NULL)
+        return(smprintf("%s",""));
+
+	/*
+	fout = fopen("/tmp/.dwmbuf.tmp", "w");
+	if (fout == NULL)
+    	{
+        	fclose(fin);
+        	return(smprintf("%s"," "));
+    	}
+	*/
+
+    	while (fgets(line, sizeof(line), fin))
+    	{
+        	if (c == 0)
+		{
+        	    line[strlen(line)-1]='\0';
+            		toprint = smprintf("%s",line);
+		}
+		/*
+        	if (c > 0)
+            	fputs(line, fout);
+        	c += 1;
+		*/
+    }
+
+    fclose(fin);
+    //fclose(fout);
+
+    //rename("/tmp/.dwmbuf.tmp", path);
+
+    if (toprint != NULL)
+        return(smprintf("%s",toprint));
+    else
+        return(smprintf("%s",""));
+}
+
 int
 main(void)
 {
-	char *status;
-	char *avgs;
-	char *bat;
-	char *bat1;
-	char *tmar;
-	char *tmutc;
-	char *tmbln;
-	char *t0, *t1, *t2;
+	
+	char *status = NULL;
+	#if NOTEBOOK
+	char *bat = NULL;
+	#endif
+	char *date = NULL;
+	char *temp = NULL;
+	char *loadAvg = NULL;
+	char *mpdSong = NULL;
+	char *dataFS = NULL;
+	char *rootFS = NULL;
+	char *info = NULL;
+	char *vol = NULL;
+	char *mem = NULL;
+	char *ip_eth = NULL;
+	char *ip_wifi = NULL;
+
+	//time_t count5min = 0;
+    	time_t count60 = 0;
+    	time_t count5 = 0;
 
 	if (!(dpy = XOpenDisplay(NULL))) {
 		fprintf(stderr, "dwmstatus: cannot open display.\n");
 		return 1;
 	}
 
-	for (;;sleep(60)) {
-		avgs = loadavg();
-		bat = getbattery("/sys/class/power_supply/BAT0");
-		bat1 = getbattery("/sys/class/power_supply/BAT1");
-		tmar = mktimes("%H:%M", tzargentina);
-		tmutc = mktimes("%H:%M", tzutc);
-		tmbln = mktimes("KW %W %a %d %b %H:%M %Z %Y", tzberlin);
-		t0 = gettemperature("/sys/devices/virtual/hwmon/hwmon0", "temp1_input");
-		t1 = gettemperature("/sys/devices/virtual/hwmon/hwmon2", "temp1_input");
-		t2 = gettemperature("/sys/devices/virtual/hwmon/hwmon4", "temp1_input");
+	for (;;sleep(1)) {
+	
+		/* roda a cada minuto */
+		if ( runevery(&count60, 60) ) {
+			free(date);
+			#if NOTEBOOK
+			free(bat);
+			#endif
+			date = mktimes("%d/%m/%y %a-%b %H:%M", tzsp);
+			#if NOTEBOOK
+			bat = getbattery("/sys/class/power_supply/"BAT_DEVICE);
+			#endif
+		}
 
-		status = smprintf("T:%s|%s|%s L:%s B:%s|%s A:%s U:%s %s",
-				t0, t1, t2, avgs, bat, bat1, tmar, tmutc,
-				tmbln);
+		/* roda a cada 5 segundos */
+		if (runevery(&count5, 5)){
+			free(dataFS);
+			free(rootFS);
+			free(ip_eth);
+			#if NOTEBOOK
+			free(ip_wifi);
+			#endif
+			dataFS = get_freespace(DATAFS);
+			rootFS = get_freespace(ROOTFS);
+			ip_eth = get_ip(WIRED_IFACE);
+			#if NOTEBOOK
+			ip_wifi = get_ip(WIRELESS_IFACE);
+			#endif
+     		}
+
+		/* roda a cada 5 min
+		if (runevery(&count5min, 300) ){
+		}
+		*/
+
+		/* Roda a cada segundo */
+		vol = get_vol();
+		temp = gettemperature(TEMP_SENSOR_DIR TEMP_SENSOR0 , "temp1_input");
+		loadAvg = loadavg();
+		mpdSong = cut_song_name(getmpdstat());
+		mem = get_mem(0);
+		info = tmpinfo();
+		
+		status = smprintf(" [%s] [%s] [%s] [%s] [%s] [%s] [%s%%, %s%%] [%s] [%s] [%s] %s", 
+				mpdSong, 
+				loadAvg,
+				mem,
+				temp,
+				ip_wifi,
+				ip_eth,
+				rootFS,
+				dataFS,
+				date,
+				vol,
+				bat,
+				info);
+		/*
+		status = smprintf(" [%s] [%s] [%s] [%s] [%s] [%s%%, %s%%] [%s] [%s] ", 
+				mpdSong, 
+				loadAvg,
+				mem,
+				temp,
+				ip_eth,
+				rootFS,
+				dataFS,
+				date,
+				vol,
+				info);
+		*/
+
+
 		setstatus(status);
-
-		free(t0);
-		free(t1);
-		free(t2);
-		free(avgs);
-		free(bat);
-		free(bat1);
-		free(tmar);
-		free(tmutc);
-		free(tmbln);
+		
+		free(temp);
+		free(loadAvg);
 		free(status);
+		free(mpdSong);
+		free(vol);
+		free(info);
+
 	}
 
 	XCloseDisplay(dpy);
