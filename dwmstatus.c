@@ -368,8 +368,9 @@ char
 char 
 *get_ip(const char *iface) {
 
-	char *ip = calloc(15,sizeof(char));
+	char *ip = calloc(17,sizeof(char));
 	strcpy(ip, runcmd(smprintf("ip -4 -o addr show dev %s | awk '{split($4,a,\"/\");print a[1]}'",iface)));
+	ip[17]='\0';
 
 	
 	//sp
@@ -542,7 +543,7 @@ main(void)
 		mem = get_mem(0);
 		info = tmpinfo();
 		
-		status = smprintf(" [%s ] [%s] [%s] [%s] [%s] [%s] [%s%%, %s%%] [%s] [%s] [%s] %s", 
+		status = smprintf("[%s] [%s] [%s] [%s] [%s] [%s] [%s%%, %s%%] [%s] [%s] [%s] %s", 
 				mpdSong, 
 				loadAvg,
 				mem,
