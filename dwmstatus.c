@@ -28,6 +28,9 @@
 #define MPD_PORT 60960
 #define MPD_HOST "localhost"
 #define MPD_MAX_SONG_LEN 25
+#define MPD_STATUS_ICON ""
+#define MPD_PLAYING_ICON ""
+#define MPD_PAUSED_ICON ""
 #define ROOTFS "/"
 #define DATAFS "/mnt/PABLO"
 #define WIRELESS_IFACE "wlp3s0"
@@ -201,98 +204,98 @@ gettemperature(char *base, char *sensor)
 	return smprintf("%02.0f°C", atof(co) / 1000);
 }
 
-//ugly hack, don't stare at him
-char *
-cut_song_name(char *name)
-{
-	/* the mpd_song_get_uri function from mpdlib returns a complete 
-	 * path of the song(relative to the mpd song dir).
-	 * Therefore, this function processes the mpd_song_get_uri return 
-	 * string and removes the adjacent dir paths,also caps the strlen to 
-	 * MPD_MAX_SONG_LEN */
-
-	if(!strcmp(name, "")) return name;
-	
-	char *strRet;
-	char *p;
-	int lenp;
-
-	p =strstr(name, "/") + 1;
-	while(strstr(p, "/") != NULL)
-		p = strstr(p, "/") + 1;
-	
-	lenp = strlen(p);
-
-	if(lenp > MPD_MAX_SONG_LEN) {
-		strRet = (char *)calloc(MPD_MAX_SONG_LEN+6,sizeof(char));
-		strncpy(strRet, p,MPD_MAX_SONG_LEN);
-		strcat(strRet,"...");
-	}
-	else {
-		strRet = (char *)calloc(lenp + 2, sizeof(char));
-		strcpy(strRet,p);
-	}
-
-	free(name);
-	return(strRet);	
-}
-
-char *
-getmpdstat() {
-    struct mpd_song * song = NULL;
-	//const char * title = NULL;
-	//const char * artist = NULL;
-	const char * file_name = NULL;
-	char * retstr = NULL;
-	//int elapsed = 0, total = 0;
-    struct mpd_connection * conn ;
-    if (!(conn = mpd_connection_new(MPD_HOST, 0, MPD_PORT)) ||
-        mpd_connection_get_error(conn)){
-            return smprintf("");
-    }
-
-    mpd_command_list_begin(conn, true);
-    mpd_send_status(conn);
-    mpd_send_current_song(conn);
-    mpd_command_list_end(conn);
-
-    struct mpd_status* theStatus = mpd_recv_status(conn);
-    	/* MPD_STATE_PLAY, MPD_STATE_PAUSE , MPD_STATE_STOP */
-	if ((theStatus) && (mpd_status_get_state(theStatus) !=  MPD_STATE_STOP)){ 
-                mpd_response_next(conn);
-                song = mpd_recv_song(conn);
-                //title = smprintf("%s",mpd_song_get_tag(song, MPD_TAG_TITLE, 0));
-                //artist = smprintf("%s",mpd_song_get_tag(song, MPD_TAG_ARTIST, 0));
-                file_name = smprintf("%s",mpd_song_get_uri(song));
-
-                //elapsed = mpd_status_get_elapsed_time(theStatus);
-                //total = mpd_status_get_total_time(theStatus);
-                mpd_song_free(song);
-                /*
-		retstr = smprintf("%.2d:%.2d/%.2d:%.2d %s - %s",
-                                elapsed/60, elapsed%60,
-                                total/60, total%60,
-                                artist, title);
-		*/
-		/*
-		retstr = smprintf("(%.2d:%.2d/%.2d:%.2d) %s",
-				elapsed/60,
-				elapsed%60,
-                                total/60,
-				total%60,
-                                file_name);
-                */
-		
-		retstr = smprintf("%s",file_name);
-		//free((char*)title);
-                //free((char*)artist);
-                free((char*)file_name);
-        }
-        else retstr = smprintf("");
-		mpd_response_finish(conn);
-		mpd_connection_free(conn);
-		return retstr;
-}
+////ugly hack, don't stare at him
+//char *
+//cut_song_name(char *name)
+//{
+//	/* the mpd_song_get_uri function from mpdlib returns a complete 
+//	 * path of the song(relative to the mpd song dir).
+//	 * Therefore, this function processes the mpd_song_get_uri return 
+//	 * string and removes the adjacent dir paths,also caps the strlen to 
+//	 * MPD_MAX_SONG_LEN */
+//
+//	if(!strcmp(name, "")) return name;
+//	
+//	char *strRet;
+//	char *p;
+//	int lenp;
+//
+//	p =strstr(name, "/") + 1;
+//	while(strstr(p, "/") != NULL)
+//		p = strstr(p, "/") + 1;
+//	
+//	lenp = strlen(p);
+//
+//	if(lenp > MPD_MAX_SONG_LEN) {
+//		strRet = (char *)calloc(MPD_MAX_SONG_LEN+6,sizeof(char));
+//		strncpy(strRet, p,MPD_MAX_SONG_LEN);
+//		strcat(strRet,"...");
+//	}
+//	else {
+//		strRet = (char *)calloc(lenp + 2, sizeof(char));
+//		strcpy(strRet,p);
+//	}
+//
+//	free(name);
+//	return(strRet);	
+//}
+//
+//char *
+//getmpdstat() {
+//    struct mpd_song * song = NULL;
+//	//const char * title = NULL;
+//	//const char * artist = NULL;
+//	const char * file_name = NULL;
+//	char * retstr = NULL;
+//	//int elapsed = 0, total = 0;
+//    struct mpd_connection * conn ;
+//    if (!(conn = mpd_connection_new(MPD_HOST, 0, MPD_PORT)) ||
+//        mpd_connection_get_error(conn)){
+//            return smprintf("");
+//    }
+//
+//    mpd_command_list_begin(conn, true);
+//    mpd_send_status(conn);
+//    mpd_send_current_song(conn);
+//    mpd_command_list_end(conn);
+//
+//    struct mpd_status* theStatus = mpd_recv_status(conn);
+//    	/* MPD_STATE_PLAY, MPD_STATE_PAUSE , MPD_STATE_STOP */
+//	if ((theStatus) && (mpd_status_get_state(theStatus) !=  MPD_STATE_STOP)){ 
+//                mpd_response_next(conn);
+//                song = mpd_recv_song(conn);
+//                //title = smprintf("%s",mpd_song_get_tag(song, MPD_TAG_TITLE, 0));
+//                //artist = smprintf("%s",mpd_song_get_tag(song, MPD_TAG_ARTIST, 0));
+//                file_name = smprintf("%s",mpd_song_get_uri(song));
+//
+//                //elapsed = mpd_status_get_elapsed_time(theStatus);
+//                //total = mpd_status_get_total_time(theStatus);
+//                mpd_song_free(song);
+//                /*
+//		retstr = smprintf("%.2d:%.2d/%.2d:%.2d %s - %s",
+//                                elapsed/60, elapsed%60,
+//                                total/60, total%60,
+//                                artist, title);
+//		*/
+//		/*
+//		retstr = smprintf("(%.2d:%.2d/%.2d:%.2d) %s",
+//				elapsed/60,
+//				elapsed%60,
+//                                total/60,
+//				total%60,
+//                                file_name);
+//                */
+//		
+//		retstr = smprintf("%s",file_name);
+//		//free((char*)title);
+//                //free((char*)artist);
+//                free((char*)file_name);
+//        }
+//        else retstr = smprintf("");
+//		mpd_response_finish(conn);
+//		mpd_connection_free(conn);
+//		return retstr;
+//}
 
 char *get_freespace(char *mntpt){
     struct statvfs data;
@@ -451,6 +454,21 @@ tmpinfo()
         return(smprintf("%s",""));
 }
 
+char 
+*getmpcstat() {
+	char song[MPD_MAX_SONG_LEN+10];
+	int status;
+	strncpy(song, runcmd("mpc current -f '%artist% - %title%'"), MPD_MAX_SONG_LEN);
+	song[MPD_MAX_SONG_LEN] = '\0';
+	status = atoi( runcmd("[ -n \"$(mpc|grep playing)\" ] ; echo $?") );
+
+	if(!strlen(song))
+		return smprintf("");
+	else
+		return smprintf("%s | %s", song,  !status ? MPD_PLAYING_ICON : MPD_PAUSED_ICON, song);
+
+}
+
 int
 main(void)
 {
@@ -519,11 +537,12 @@ main(void)
 		vol = get_vol();
 		temp = gettemperature(TEMP_SENSOR_DIR TEMP_SENSOR0 , "temp1_input");
 		loadAvg = loadavg();
-		mpdSong = cut_song_name(getmpdstat());
+		//mpdSong = cut_song_name(getmpdstat());
+		mpdSong = getmpcstat();
 		mem = get_mem(0);
 		info = tmpinfo();
 		
-		status = smprintf(" [%s] [%s] [%s] [%s] [%s] [%s] [%s%%, %s%%] [%s] [%s] [%s] %s", 
+		status = smprintf(" [%s ] [%s] [%s] [%s] [%s] [%s] [%s%%, %s%%] [%s] [%s] [%s] %s", 
 				mpdSong, 
 				loadAvg,
 				mem,
