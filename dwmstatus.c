@@ -16,7 +16,7 @@
 #include <sys/sysinfo.h>
 
 //0 desktop , 1 notebook
-#define NOTEBOOK 1
+#define NOTEBOOK 0
 
 //options
 #define BAT_DEVICE "BAT1"
@@ -34,7 +34,7 @@
 #define ROOTFS "/"
 #define DATAFS "/mnt/PABLO"
 #define WIRELESS_IFACE "wlp3s0"
-#define WIRED_IFACE "enp0s31f6"
+#define WIRED_IFACE "enp3s0"
 
 //timezones
 char *tzutc = "UTC";
@@ -543,6 +543,7 @@ main(void)
 		mem = get_mem(0);
 		info = tmpinfo();
 		
+		/*
 		status = smprintf("[%s] [%s] [%s] [%s] [%s] [%s] [%s%%, %s%%] [%s] [%s] [%s] %s", 
 				mpdSong, 
 				loadAvg,
@@ -556,8 +557,9 @@ main(void)
 				vol,
 				bat,
 				info);
-		/*
-		status = smprintf(" [%s] [%s] [%s] [%s] [%s] [%s%%, %s%%] [%s] [%s] ", 
+		*/
+
+		status = smprintf(" [%s] [%s] [%s] [%s] [%s] [%s%%, %s%%] [%s] [%s] %s", 
 				mpdSong, 
 				loadAvg,
 				mem,
@@ -568,7 +570,6 @@ main(void)
 				date,
 				vol,
 				info);
-		*/
 
 
 		setstatus(status);
