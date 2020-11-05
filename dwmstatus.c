@@ -385,8 +385,8 @@ char
 	//return runcmd(smprintf("ip -4 -o addr show dev %s | awk '{split($4,a,\"/\");print a[1]}'",iface));
 	
 	//toda string contendo um endereço ip terá o primeiro caractere alfanumerico,assim , uma saída inválida será filtrada nessa exceção
-	if(!isalnum(ip[0]))
-		strcpy(ip,"");
+	if(!isdigit(ip[0]))
+        ip[0] = '\0';
 	return ip;
 }
 
