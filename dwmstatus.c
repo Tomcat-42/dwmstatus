@@ -24,7 +24,7 @@
 #define BAT_CHARGING_SYMBOL '+'
 #define BAT_DISCHARGING_SYMBOL '-'
 #define TEMP_SENSOR_DIR "/sys/devices/virtual/thermal/thermal_zone0/"
-#define TEMP_SENSOR0 "hwmon0"
+#define TEMP_SENSOR0 "hwmon1"
 #define MPD_PORT 60960
 #define MPD_HOST "localhost"
 #define MPD_MAX_SONG_LEN 25
