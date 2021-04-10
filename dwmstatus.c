@@ -19,7 +19,8 @@
 #define NOTEBOOK 1
 
 //options
-#define BAT_DEVICE "BAT1"
+#define BAT_DEVICE_1 "BAT1"
+#define BAT_DEVICE_0 "BAT0"
 #define BAT_FULL_SYMBOL '='
 #define BAT_CHARGING_SYMBOL '+'
 #define BAT_DISCHARGING_SYMBOL '-'
@@ -135,10 +136,10 @@ readfile(char *base, char *file)
 
 #if NOTEBOOK
 char *
-getbattery(char *base)
+getbattery(char *base0, char *base1)
 {
-	char *co, status;
-	int capacity;
+	char *co, status0, status1;
+	int capacity0, capacity1;
 	/*
 	int descap, remcap;
 
@@ -172,16 +173,28 @@ getbattery(char *base)
 	sscanf(co, "%d", &remcap);
 	free(co);
 	*/
-	co = readfile(base, "capacity");
-	sscanf(co, "%d",&capacity);
+	co = readfile(base0, "capacity");
+	sscanf(co, "%d",&capacity0);
+	co = readfile(base1, "capacity");
+	sscanf(co, "%d",&capacity1);
 
-	co = readfile(base, "status");
+
+	co = readfile(base0, "status");
 	if (!strncmp(co, "Discharging", 11)) {
-		status = BAT_DISCHARGING_SYMBOL;
+		status0 = BAT_DISCHARGING_SYMBOL;
 	} else if(!strncmp(co, "Charging", 8)) {
-		status = BAT_CHARGING_SYMBOL;
+		status0 = BAT_CHARGING_SYMBOL;
 	} else {
-		status = BAT_FULL_SYMBOL;
+		status0 = BAT_FULL_SYMBOL;
+	}
+
+	co = readfile(base1, "status");
+	if (!strncmp(co, "Discharging", 11)) {
+		status1 = BAT_DISCHARGING_SYMBOL;
+	} else if(!strncmp(co, "Charging", 8)) {
+		status1 = BAT_CHARGING_SYMBOL;
+	} else {
+		status1 = BAT_FULL_SYMBOL;
 	}
 	
 	/*
@@ -189,7 +202,7 @@ getbattery(char *base)
 		return smprintf("invalid");
 	*/
 
-	return smprintf("%d%%%c", capacity, status);
+	return smprintf("%d%%%c | %d%%%c" , capacity0, status0, capacity1, status1);
 }
 #endif
 
@@ -509,7 +522,7 @@ main(void)
 			#endif
 			date = mktimes("%d/%m/%y %a-%b %H:%M", tzsp);
 			#if NOTEBOOK
-			bat = getbattery("/sys/class/power_supply/"BAT_DEVICE);
+			bat = getbattery("/sys/class/power_supply/"BAT_DEVICE_0, "/sys/class/power_supply/"BAT_DEVICE_1);
 			#endif
 		}
 
@@ -543,7 +556,7 @@ main(void)
 		mem = get_mem(0);
 		info = tmpinfo();
 		
-		status = smprintf("[%s] [%s] [%s] [%s] [%s] [%s] [%s%%, %s%%] [%s] [%s] [%s] %s", 
+		status = smprintf(" [%s]  [%s]  [%s]  [%s]  [%s]  [%s]  [%s%% | %s%%]  [%s]  [%s]   [%s] %s", 
 				mpdSong, 
 				loadAvg,
 				mem,
