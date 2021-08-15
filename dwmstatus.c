@@ -483,6 +483,80 @@ char
 
 }
 
+
+int
+parse_netdev(unsigned long long int *receivedabs, unsigned long long int *sentabs)
+{
+	char buf[255];
+	char *datastart;
+	static int bufsize;
+	int rval;
+	FILE *devfd;
+	unsigned long long int receivedacc, sentacc;
+
+	bufsize = 255;
+	devfd = fopen("/proc/net/dev", "r");
+	rval = 1;
+
+	// Ignore the first two lines of the file
+	fgets(buf, bufsize, devfd);
+	fgets(buf, bufsize, devfd);
+
+	while (fgets(buf, bufsize, devfd)) {
+	    if ((datastart = strstr(buf, "lo:")) == NULL) {
+		datastart = strstr(buf, ":");
+
+		// With thanks to the conky project at http://conky.sourceforge.net/
+		sscanf(datastart + 1, "%llu  %*d     %*d  %*d  %*d  %*d   %*d        %*d       %llu",\
+		       &receivedacc, &sentacc);
+		*receivedabs += receivedacc;
+		*sentabs += sentacc;
+		rval = 0;
+	    }
+	}
+
+	fclose(devfd);
+	return rval;
+}
+
+void
+calculate_speed(char *speedstr, unsigned long long int newval, unsigned long long int oldval)
+{
+	double speed;
+	speed = (newval - oldval) / 1024.0;
+	if (speed > 1024.0) {
+	    speed /= 1024.0;
+	    sprintf(speedstr, "%.3f MB/s", speed);
+	} else {
+	    sprintf(speedstr, "%.2f KB/s", speed);
+	}
+}
+
+char *
+get_netusage(unsigned long long int *rec, unsigned long long int *sent)
+{
+	unsigned long long int newrec, newsent;
+	newrec = newsent = 0;
+	char downspeedstr[15], upspeedstr[15];
+	static char retstr[42];
+	int retval;
+
+	retval = parse_netdev(&newrec, &newsent);
+	if (retval) {
+	    fprintf(stdout, "Error when parsing /proc/net/dev file.\n");
+	    exit(1);
+	}
+
+	calculate_speed(downspeedstr, newrec, *rec);
+	calculate_speed(upspeedstr, newsent, *sent);
+
+	sprintf(retstr, " %s  %s", downspeedstr, upspeedstr);
+
+	*rec = newrec;
+	*sent = newsent;
+	return retstr;
+}
+
 int
 main(void)
 {
@@ -502,6 +576,9 @@ main(void)
 	char *mem = NULL;
 	char *ip_eth = NULL;
 	char *ip_wifi = NULL;
+
+  char *netstats = NULL;
+	static unsigned long long int rec = 0, sent = 0;
 
 	//time_t count5min = 0;
     	time_t count60 = 0;
@@ -555,33 +632,36 @@ main(void)
 		mpdSong = getmpcstat();
 		mem = get_mem(0);
 		info = tmpinfo();
+    netstats = get_netusage(&rec, &sent);
 		
-		status = smprintf(" [%s]  [%s]  [%s]  [%s]  [%s]  [%s]  [%s%% | %s%%]  [%s]  [%s]   [%s] %s", 
+		/* status = smprintf(" ::|%s|  ::|%s|  ::|%s| ::|%s|  ::|%s|  ::|%s|  ::|%s%%  %s%%|  ::|%s|  ::|%s|   ::|%s %s| ",  */
+				/* mpdSong,  */
+				/* loadAvg, */
+				/* mem, */
+				/* temp, */
+				/* ip_wifi, */
+				/* ip_eth, */
+				/* rootFS, */
+				/* dataFS, */
+				/* date, */
+				/* vol, */
+				/* bat, */
+				/* info); */
+
+		status = smprintf(" [%s]  [%s]  [%s]  [%s]  [%s]  [%s]  [%s]  [%s%%  %s%%]  [%s]  [%s]   [%s %s] ", 
 				mpdSong, 
 				loadAvg,
 				mem,
 				temp,
 				ip_wifi,
 				ip_eth,
+        netstats,
 				rootFS,
 				dataFS,
 				date,
 				vol,
 				bat,
 				info);
-		/*
-		status = smprintf(" [%s] [%s] [%s] [%s] [%s] [%s%%, %s%%] [%s] [%s] ", 
-				mpdSong, 
-				loadAvg,
-				mem,
-				temp,
-				ip_eth,
-				rootFS,
-				dataFS,
-				date,
-				vol,
-				info);
-		*/
 
 
 		setstatus(status);
