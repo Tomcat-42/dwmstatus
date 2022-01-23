@@ -634,8 +634,8 @@ main(void)
 		info = tmpinfo();
     netstats = get_netusage(&rec, &sent);
 		
-		/* status = smprintf(" ::|%s|  ::|%s|  ::|%s| ::|%s|  ::|%s|  ::|%s|  ::|%s%%  %s%%|  ::|%s|  ::|%s|   ::|%s %s| ",  */
-				/* mpdSong,  */
+		/* status = smprintf(" ::|%s|  ::|%s|  ::|%s| ::|%s|  ::|%s|  ::|%s|  ::|%s%%  %s%%|  ::|%s|  ::|%s|   ::|%s %s| ", */
+				/* mpdSong, */
 				/* loadAvg, */
 				/* mem, */
 				/* temp, */
@@ -648,8 +648,8 @@ main(void)
 				/* bat, */
 				/* info); */
 
-		status = smprintf(" [%s]  [%s]  [%s]  [%s]  [%s]  [%s]  [%s]  [%s%%  %s%%]  [%s]  [%s]   [%s %s] ", 
-				mpdSong, 
+          status = smprintf("\x02  %s \x05  %s \x03  %s \x04  %s \x07  %s \x08  %s \x09   %s \xa  %s%%  %s%% \x06  %s \x07  %s \x02   %s %s",
+				mpdSong,
 				loadAvg,
 				mem,
 				temp,
